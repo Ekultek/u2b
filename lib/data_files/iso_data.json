@@ -2,6 +2,7 @@
   "iso_links": {
 
     "pentest": {
+
       "parrot": {
         "64": "https://mirrordirector.archive.parrotsec.org/parrot/iso/3.7/Parrot-full-3.7_amd64.iso",
         "32": "https://mirrordirector.archive.parrotsec.org/parrot/iso/3.7/Parrot-full-3.7_i386.iso"
@@ -14,21 +15,24 @@
         "64": "http://ftp.halifax.rwth-aachen.de/blackarch/iso/blackarchlinux-live-2017.06.14-x86_64.iso",
         "32": "http://ftp.halifax.rwth-aachen.de/blackarch/iso/blackarchlinux-live-2017.06.14-i686.iso"
       }
+
     },
 
     "linux": {
+
       "ubuntu": {
-        "64": "",
-        "32": ""
+        "64": "http://releases.ubuntu.com/17.04/ubuntu-17.04-desktop-amd64.iso?_ga=2.70779856.1180187780.1499964419-1628966372.1499964419",
+        "32": "http://releases.ubuntu.com/17.04/ubuntu-17.04-desktop-i386.iso?_ga=2.70779856.1180187780.1499964419-1628966372.1499964419"
       },
       "debian": {
-        "64": "",
-        "32": ""
+        "64": "https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-9.0.0-amd64-netinst.iso",
+        "32": "https://cdimage.debian.org/debian-cd/current/i386/iso-cd/debian-9.0.0-i386-netinst.iso"
       },
       "arch": {
-        "64": "",
+        "64": "https://archlinux.surlyjake.com/archlinux/iso/2017.07.01/",
         "32": ""
       }
+
     }
   }
 }

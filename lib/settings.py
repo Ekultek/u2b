@@ -1,36 +1,48 @@
+# ~*~ encoding: utf-8 ~*~
+
 import os
-import logging
 import itertools
 import time
 import math
 import sys
 import json
-import shutil
+import datetime
 import multiprocessing
 
 import psutil
 import requests
-from colorlog import ColoredFormatter
 
-from thirdparty.iso9660 import ISO9660
+import lib
 
-log_level = logging.DEBUG
-logger_format = "[%(log_color)s%(asctime)s %(levelname)s%(reset)s] %(log_color)s%(message)s%(reset)s"
-logging.root.setLevel(log_level)
-formatter = ColoredFormatter(logger_format, datefmt="%H:%M:%S",
-                             log_colors={
-                                 "DEBUG": "bold,cyan",
-                                 "INFO": "green",
-                                 "WARNING": "yellow",
-                                 "ERROR": "red",
-                                 "CRITICAL": "bold,red"
-                             })
-stream = logging.StreamHandler()
-stream.setLevel(log_level)
-stream.setFormatter(formatter)
-LOGGER = logging.getLogger('configlog')
-LOGGER.setLevel(log_level)
-LOGGER.addHandler(stream)
+from download_iso import (
+    start_stream_download,
+    NoLinkFoundException,
+    DownloadedEmptyException
+)
+
+CLONE_LINK = "https://github.com/ekultek/i2b.git"
+TYPE_COLORS = {"dev": 33, "stable": 92}
+VERSION = "1.0"
+
+if len(VERSION) >= 4:
+    VERSION_STRING = "\033[92mv{}\033[0m(\033[{}m\033[1m#dev\033[0m)".format(VERSION, TYPE_COLORS["dev"])
+else:
+    VERSION_STRING = "\033[92mv{}\033[0m(\033[{}m\033[1m*stable\033[0m)".format(VERSION, TYPE_COLORS["stable"])
+
+BANNER = ("""\033[36m     
+        .-''-.               
+.--.  .' .-.  )   /|     -> iso2bootable   
+|__| / .'  / /    ||     -> {} 
+.--.(_/   / /     ||     -> {}\033[36m     
+|  |     / /      ||  __     
+|  |    / /       ||/'__ '.  
+|  |   . '        |:/`  '. ' 
+|  |  / /    _.-')||     | | 
+|__|.' '  _.'.-'' ||\    / ' 
+   /  /.-'_.'     |/\\'..' /  
+  /    _.'        '  `'-'`   
+ ( _.-'                      
+{}\033[0m""".format(CLONE_LINK, VERSION_STRING, "=" * 30))
 
 
 def create_dir(dirname, verbose=False):
@@ -39,21 +51,49 @@ def create_dir(dirname, verbose=False):
     """
     if not os.path.exists(dirname):
         if verbose:
-            LOGGER.debug("Directory '{}/*' not found, creating it..".format(dirname))
+            lib.log.console_log.LOGGER.debug("Directory '{}/*' not found, creating it..".format(dirname))
         os.mkdir(dirname)
     else:
-        LOGGER.debug("Directory found, skipping..")
+        lib.log.console_log.LOGGER.debug("Directory '{}/*' found, skipping..".format(dirname))
 
 
 def avail_drives(verbose=False):
+    def _find_path(data, verbose=False):
+        if verbose: lib.log.console_log.LOGGER.debug("Finding path index..")
+        start_index = data.find("/")
+        if verbose: lib.log.console_log.LOGGER.debug("Index found: '{}'. Path is: '{}'..".format(start_index, data[start_index:-1]))
+        return data[start_index:-1]
+
+    def _get_drive_size(path, verbose=False):
+        if verbose: lib.log.console_log.LOGGER.debug("Calculating size of drive..")
+        vfs = os.statvfs(path)
+        available = vfs.f_frsize * vfs.f_blocks
+        if verbose: LOGGER.debug("Drive size is equal to: '{}' ({} bytes)..".format(
+            convert_file_size(available), available)
+        )
+        return available
+
     usable_boots = set()
     data_disks = psutil.disk_partitions()
     for disk in data_disks:
-        if verbose:
-            LOGGER.debug("Found {}..".format(disk))
         if "/media" in disk[1]:
             usable_boots.add(disk)
-    return list(usable_boots)
+    if usable_boots:
+        if verbose: lib.log.console_log.LOGGER.debug("Found usable drive(s): '{}'..".format(usable_boots))
+        path_data = _find_path(str(usable_boots).split(",")[0], verbose=verbose)
+
+        return {
+            "path": path_data,
+            "size": _get_drive_size(path_data, verbose=verbose)
+        }
+    else:
+        lib.log.console_log.LOGGER.debug(
+            "It seems that you either do not have a USB in the system, "
+            "or have your system setup in a way not recognized by i2B. "
+            "Please check your USB's and your system configuration and "
+            "try again. Exiting.."
+        )
+        return None
 
 
 def prompt(reason, data):
@@ -95,10 +135,10 @@ def search_for_iso(dirname=None, proc_num=48, verbose=False, default_path="/"):
     retval = set()
     if dirname is None:
         if verbose:
-            LOGGER.debug("Starting {} processes to search  directory '{}' for .iso files..".format(
+            lib.log.console_log.LOGGER.debug("Starting {} processes to search directory '{}' for .iso files..".format(
                 proc_num, default_path
             ))
-            # start multiprocessing the search using the number of given processes
+        # start multiprocessing the search using the number of given processes
         pool = multiprocessing.Pool(processes=proc_num)
         walker = os.walk(default_path)
         file_data_gen = itertools.chain.from_iterable(
@@ -109,34 +149,19 @@ def search_for_iso(dirname=None, proc_num=48, verbose=False, default_path="/"):
         for data in results:
             if data is not None:
                 if verbose:
-                    LOGGER.debug("Found .iso file: '{}'".format(data))
+                    lib.log.console_log.LOGGER.debug("Found .iso file: '{}'".format(data))
                 retval.add(data)
     else:
         if verbose:
-            LOGGER.debug("Searching {} for .iso files..".format(dirname))
+            lib.log.console_log.LOGGER.debug("Searching {} for .iso files..".format(dirname))
         for iso in os.listdir(dirname):
             if iso.endswith(".iso"):
                 if verbose:
-                    LOGGER.debug("Found {}..".format(iso))
+                    lib.log.console_log.LOGGER.debug("Found {}..".format(iso))
                 retval.add(iso)
     if len(retval) == 0:
-        LOGGER.fatal("No ISO files found. Verify directory and try again.")
+        lib.log.console_log.LOGGER.debug("No ISO files found. Verify directory and try again.")
     return list(retval)
-
-
-def unzip_iso(filepath, verbose=False):
-    iso_file = ISO9660(filepath)
-
-    def create_dirname(path):
-        data = path.split("/")[-1]
-        items = data.split(".")
-        return items[0]
-
-    for iso_item in iso_file.tree():
-        if iso_item == "/":
-            pass
-        else:
-            shutil.copyfile(iso_item, create_dirname(filepath))
 
 
 def convert_file_size(byte_size, magic_num=1024):
@@ -146,6 +171,7 @@ def convert_file_size(byte_size, magic_num=1024):
       > :param magic_num: the magic number that makes everything work, 1024
       > :return: the amount of data in bytes, kilobytes, megabytes, etc..
     """
+    byte_size = float(byte_size)
     if byte_size == 0:
         return "0B"
     # Probably won't need more then GB, but still it's good to have
@@ -156,30 +182,75 @@ def convert_file_size(byte_size, magic_num=1024):
     return "{}{}".format(rounded_data, size_data_names[floored])
 
 
-def download_iso(iso_type, distro, verbose=False, json_path="{}/lib/data_files/iso_data.json"):
+def download(iso_type, distro, verbose=False, json_path="{}/lib/data_files/iso_data.json", personal=None):
     def get_filename(link):
         return link.split("/")[-1]
 
     is_64bit = sys.maxsize > 2 ** 32
     arch = "64" if is_64bit else "32"
     if verbose:
-        LOGGER.debug("Platform architecture appears to be {}bit...".format(arch))
+        lib.log.console_log.LOGGER.debug("Platform architecture appears to be {}bit...".format(arch))
     json_info = open(json_path.format(os.getcwd())).read()
     json_resp = json.loads(json_info)
     json_data = json_resp["iso_links"]
-    download_link = json_data[iso_type][distro][arch]
+    if personal is None:
+        try:
+            download_link = json_data[iso_type][distro][arch]
+            if verbose:
+                lib.log.console_log.LOGGER.debug("Fetching download link..")
+                if download_link is not None:
+                    lib.log.console_log.LOGGER.debug("Found: '{}'".format(download_link))
+        except Exception:
+            raise NoLinkFoundException(
+                "It appears that you have not entered a valid link, try again.. "
+                "With the ISO link flag (--iso-link=<LINK>)."
+            )
+    else:
+        download_link = personal
     filename = get_filename(download_link)
     resp = requests.get(download_link, stream=True)
+    if verbose:
+        lib.log.console_log.LOGGER.debug("Status '{}' '{}' code returned".format(
+            "OK" if resp.status_code == 200 else "FAILED",
+            resp.status_code
+        ))
+    if resp.status_code != 200:
+        raise NoLinkFoundException(
+            "The website returned a status code of '{}'. "
+            "It seems that the link is broken, double check "
+            "the link or pass your own with the ISO link flag "
+            "(--iso-link=<LINK>). If you grabbed the print link from "
+            "the JSON file, make an issue about this".format(resp.status_code)
+        )
     download_total = resp.headers.get("content-length")
-    with open(filename, "a+") as iso_file:
-        if download_total is None:
-            iso_file.write(resp.content)
-            LOGGER.critical(
-                "File was saved empty, either the link is broken '{}' "
-                "or something bad happened..."
-            )
-            # TODO:\ Create a option to download 32bit
-        else:
-            # TODO:\ Finish the download stream
-            pass
+    if download_total is None:
+        DownloadedEmptyException(
+            "The ISO link '{}' returned an empty content-length "
+            "header. This could mean it was moved or deprecated. "
+            "Find the appropriate ISO download link and try again "
+            "with the ISO link flag (--iso-link=<LINK>)."
+        )
+    else:
+        start_time = time.time()
+        if verbose:
+            lib.log.console_log.LOGGER.debug("Downloading a total of {}..".format(convert_file_size(float(download_total))))
 
+        start_stream_download(filename, resp)
+        stop_time = time.time() - start_time
+        lib.log.console_log.LOGGER.debug("Done, time elapsed since download started: {}. Saved as: {}..".format(stop_time, filename))
+
+
+def mount_drive(path):
+    import glob
+    for root, sub, f in os.walk(path):
+        print root, sub, f
+
+
+def create_autorun(label, directory, filename="autorun.inf"):
+    autorun_data = "; Created by i2B (iso to boot) {}\n"
+    autorun_data += "; https://github.com/ekultek/i2B\n"
+    autorun_data += "[autorun]\n"
+    autorun_data += "icon = radiation.ico\n"
+    autorun_data += "label = {}"
+    with open(directory + "/" + filename, "a+") as auto:
+        auto.write(autorun_data.format(datetime.datetime.today(), label))

@@ -1,0 +1,24 @@
+171217
+1bDSL accepts the following boot time options:17
+70
+                                                                               
+ fb1280x1024 | fb1024x768 | fb800x600     Framebuffer mode (for notebooks)     
+ dsl vga=normal                           Safest video mode (see F3 for more)  
+ dsl xsetup                               Prompt user for X setup              
+ dsl noicons                              If booting to X use plain desktop    
+ dsl mydsl={hda1|sda1}                    Restore myDSL apps (default to cdrom)
+ dsl base                                 Skip myDSL load only the base system 
+ dsl norestore                            Turn off the automatic restore       
+ dsl restore={hda1|sda1|floppy}           Specify saved configuration location 
+ dsl toram                                Load CD into RAM and run (128+ MB)   
+ dsl tohd=/dev/hda1                       Copy CD to HD partition and run      
+ dsl fromhd=/dev/hda1                     Boot from previously copied CD-Image 
+ dsl {ssh|lpd|cron|fuse|nfs|syslog|monkey|ftp} Start various daemons at boot   
+ dsl lang=us (cs da de es fr nl it pl ru sk ...)     Choose Language/Keyboard  
+ dsl no{scsi|pcmcia|usb|agp|swap|apm|apic|mce|ddc}   Disable HW-detection      
+ dsl dma                                  Turn on DMA accel. for all drives    
+ dsl 2                                    Runlevel 2, Textmode only            
+ failsafe                                 (Almost) no hardware-detection       
+ expert                                   Interactive startup/setup            
+1f
+

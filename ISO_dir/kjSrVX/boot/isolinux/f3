@@ -1,0 +1,23 @@
+171217
+1bDSL accepts the following boot time vga options:17
+70
+ Color            640x480     800x600      1024x768     1280x1024              
+   256    8 bit     769         771           773          775                 
+ 32000   15 bit     784         787           790          793                 
+ 65000   16 bit     785         788           791          794                 
+ 16.7M   24 bit     786         789           792          795                 
+                                                                               
+ dsl vga=7xx                              7xx from table above                 
+ dsl sata                                 Support for SATA drives              
+ dsl secure                               Prompt for root and dsl passwords    
+ dsl protect                              Password encrypted backup            
+ dsl host=xxxx                            Set hostname to xxxx                 
+ dsl minimal                              Starts X with Minimal theme          
+ dsl desktop={fluxbox|jwm}                Starts with fluxbox or Joe's WM      
+ dsl waitusb                              Waits for slow USB devices           
+ dsl legacy                               Boots without unionfs                
+ dsl dosswapfile{=hda1}                   Scan or Specify dosswapfile          
+ dsl checkfs                              fscks unmounted filesystems          
+ lowram             Starts X, Minimal, noicons, nousb, noscsi, noideraid, etc. 
+ install            No X, CLI installation menu for hard drive, frugal, floppy.
+1f
